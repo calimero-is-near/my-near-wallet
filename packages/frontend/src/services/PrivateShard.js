@@ -14,7 +14,7 @@ export async function syncPrivateShardAccount({
         signature,
         shardId: shardInfo.shardId,
     };
-    const response = await fetch(`${CONFIG.CALIMERO_URL}/api/public/sync`, {
+    const response = await fetch(`${CONFIG.CALIMERO_URL}/api/public/${shardInfo.shardId}/wallet/sync`, {
         method: 'POST',
         body: JSON.stringify(postData),
         headers: {
