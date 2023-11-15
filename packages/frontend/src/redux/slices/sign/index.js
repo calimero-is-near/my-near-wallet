@@ -31,7 +31,7 @@ export const handleSignTransactions = createAsyncThunk(
         const { dispatch, getState } = thunkAPI;
         let transactionsHashes;
         const retryingTx = !!selectSignRetryTransactions(getState()).length;
-        const shardInfo = selectAccountUrlPrivateShard(getState());
+        let shardInfo = selectAccountUrlPrivateShard(getState());
 
         const mixpanelName = `SIGN${
             retryingTx ? ' - RETRYRETRY WITH INCREASED GAS' : ''
@@ -47,6 +47,31 @@ export const handleSignTransactions = createAsyncThunk(
             const accountId = selectAccountId(getState());
 
             try {
+                console.log("POKUSAT CU@");
+                if (shardInfo) {
+                    // const challenge = await wallet.fetchChallenge();
+                    // console.log('FETCHED CHALLENGE');
+                    // console.log(challenge);
+                    // console.log(accountId);
+
+                    // const account = await wallet.getAccount(accountId);
+
+                    // const sig2 = await wallet.signatureFor2(account, challenge.data);
+                    // console.log("SIG OBJECT");
+                    // console.log(sig2);
+                    // const encodedSig = Buffer.from(JSON.stringify(sig2)).toString('base64');
+
+                    // console.log('X-SIGNATURE:');
+                    // console.log(encodedSig);
+
+                    // shardInfo.xSignature = encodedSig;
+
+                    const challenge = await wallet.fetchChallenge();
+                    const account = await wallet.getAccount(accountId);
+                    const sig2 = await wallet.signatureFor2(account, challenge.data);
+                    const encodedSig = Buffer.from(JSON.stringify(sig2)).toString('base64');
+                    shardInfo.xSignature = encodedSig;
+                }
                 const signingWallet = shardInfo ? new Wallet(shardInfo) : wallet;
                 transactionsHashes = await signingWallet.signAndSendTransactions(
                     transactions,

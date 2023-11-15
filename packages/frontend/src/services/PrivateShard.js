@@ -7,20 +7,24 @@ export async function syncPrivateShardAccount({
     publicKey,
     signature,
     shardInfo,
+    encodedSig,
 }) {
     const postData = {
         accountId,
-        publicKey,
-        signature,
+        //publicKey,
+        //signature,
         shardId: shardInfo.shardId,
     };
+    console.log(postData);
     const response = await fetch(`${CONFIG.CALIMERO_URL}/api/public/sync`, {
         method: 'POST',
         body: JSON.stringify(postData),
         headers: {
             'Content-type': 'application/json; charset=utf-8',
+            'x-signature': encodedSig,
         },
     });
+    console.log(response);
     if (!response.ok) {
         const body = await response.text();
         let parsedBody;

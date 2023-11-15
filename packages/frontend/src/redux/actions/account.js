@@ -57,6 +57,7 @@ import {
     selectFlowLimitationAccountBalance,
     selectFlowLimitationAccountData,
 } from '../slices/flowLimitation';
+import { encode } from 'punycode';
 
 const { handleFlowLimitation, handleClearflowLimitation } = flowLimitationActions;
 
@@ -180,7 +181,7 @@ export const handleRefreshUrl = (prevRouter) => (dispatch, getState) => {
 const checkContractId = () => async (dispatch, getState) => {
     const contractId = selectAccountUrlContractId(getState());
     const failureUrl = selectAccountUrlFailureUrl(getState());
-    const shardInfo = selectAccountUrlPrivateShard(getState());
+    let shardInfo = selectAccountUrlPrivateShard(getState());
 
     if (contractId) {
         const redirectIncorrectContractId = () => {
@@ -199,11 +200,61 @@ const checkContractId = () => async (dispatch, getState) => {
         }
 
         try {
-            const getAccount = shardInfo
-                ? new Wallet(shardInfo).getAccountBasic
-                : wallet.getAccountBasic;
-            await getAccount(contractId).state();
+            // if (shardInfo) {
+            //     const challenge = await wallet.fetchChallenge();
+            //     const account = await wallet.getAccount(accountId);
+            //     const sig2 = await wallet.signatureFor2(account, challenge.data);
+            //     const encodedSig = Buffer.from(JSON.stringify(sig2)).toString('base64');
+            //     shardInfo.xSignature = encodedSig;
+            // }
+
+            
+
+            console.log("POKUSAJ REFRESHA!!!");
+            // console.log(contractId);
+
+            // const accountId = selectAccountId(getState());
+            // console.log(wallet.accountId);
+
+            // const caliWallet = new Wallet(shardInfo);
+            // let lala = caliWallet.connection;
+
+            // let res = await caliWallet.getAccountBasic(contractId).state();
+            // console.log("RES");
+            // console.log(res);
+
+            // console.log("LALAL");
+            // console.log(lala);
+
+            // console.log(shardInfo);
+
+            if (shardInfo) {
+                const challenge = await wallet.fetchChallenge();
+                const account = await wallet.getAccount(wallet.accountId);
+                const sig2 = await wallet.signatureFor2(account, challenge.data);
+                const encodedSig = Buffer.from(JSON.stringify(sig2)).toString('base64');
+                shardInfo.xSignature = encodedSig;
+                const caliWallet = new Wallet(shardInfo);
+                console.log("SIG FROM REFRESH");
+                console.log(encodedSig);
+                await caliWallet.getAccountBasic(contractId).state();
+            } else {
+                // const getAccount = shardInfo
+                // ? caliWallet.getAccountBasic
+                // : wallet.getAccountBasic;
+
+                await wallet.getAccountBasic(contractId).state();
+            }
+
+            // const getAccount = shardInfo
+            //     ? caliWallet.getAccountBasic
+            //     : wallet.getAccountBasic;
+            // console.log(getAccount);
+
+            // await getAccount(contractId).state();
         } catch (error) {
+            console.log("U PREKRSAJU JE");
+            console.log(error);
             if (error.message.indexOf('does not exist while viewing') !== -1) {
                 redirectIncorrectContractId();
             }
@@ -243,12 +294,17 @@ export const redirectToApp = (fallback) => async (dispatch, getState) => {
 export const allowLogin = () => async (dispatch, getState) => {
     const contractId = selectAccountUrlContractId(getState());
     const publicKey = selectAccountUrlPublicKey(getState());
+    console.log("🚀 ~ file: account.js:246 ~ allowLogin ~ publicKey:", publicKey);
     const methodNames = selectAccountUrlMethodNames(getState());
     const title = selectAccountUrlTitle(getState());
     const successUrl = selectAccountUrlSuccessUrl(getState());
 
-    const shardInfo = selectAccountUrlPrivateShard(getState());
+    let shardInfo = selectAccountUrlPrivateShard(getState());
     const addAccessKeyAction = shardInfo ? addShardAccessKey : addAccessKey;
+
+    console.log("SHARD_INFO");
+    console.log(shardInfo);
+    console.log("SHARD_INFO-END<><><>");
 
     if (shardInfo) {
         const account = await wallet.getAccount(wallet.accountId);
@@ -256,16 +312,42 @@ export const allowLogin = () => async (dispatch, getState) => {
         const publicKey = await wallet.getPublicKey(account.accountId);
         const publicKeyString = publicKey.toString(publicKey);
         signature.publicKey = publicKeyString;
+
+
+        const challenge = await wallet.fetchChallenge();
+        console.log('FETCHED CHALLENGE');
+        console.log(challenge);
+
+        const sig2 = await wallet.signatureFor2(account, challenge.data);
+        console.log("SIG OBJECT");
+        console.log(sig2);
+        const encodedSig = Buffer.from(JSON.stringify(sig2)).toString('base64');
+
+        console.log('X-SIGNATURE:');
+        console.log(encodedSig);
+
+        shardInfo.xSignature = encodedSig;
+
+        // const shardInfoWithAccess = {
+        //     shardId: shardInfo.calimeroShardId,
+        //     shardRpc: shardInfo.calimeroRPCEndpoint,
+        //     xSignature: encodedSig,
+        // };
+
         await syncPrivateShardAccount({
             accountId: wallet.accountId,
             publicKey: publicKeyString,
             signature,
             shardInfo,
+            encodedSig,
         });
     }
 
     if (successUrl) {
+        console.log("UPAO 1");
         if (publicKey) {
+            console.log("🚀 ~ file: account.js:274 ~ allowLogin ~ publicKey:", publicKey);
+            console.log("DISPATCHAM");
             await dispatch(
                 withAlert(
                     addAccessKeyAction(
@@ -293,6 +375,7 @@ export const allowLogin = () => async (dispatch, getState) => {
             window.location = parsedUrl.href;
         }
     } else {
+        console.log("NISAM UPAO");
         await dispatch(
             withAlert(
                 addAccessKeyAction(
@@ -648,6 +731,14 @@ export const { addAccessKey, addAccessKeySeedPhrase, addShardAccessKey } = creat
             shardInfo
         ) => {
             try {
+                console.log("ADD SHARD ACCESS KEY");
+                console.log(accountId);
+                console.log(contractId);
+                console.log(publicKey);
+                console.log(fullAccess);
+                console.log(methodNames);
+                console.log(shardInfo);
+                console.log("__________END___________");
                 await new Wallet(shardInfo).addAccessKey(
                     accountId,
                     contractId,

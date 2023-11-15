@@ -205,10 +205,22 @@ export default class Wallet {
         };
         let provider;
         if (rpcInfo) {
+            console.log("SETTAT CU GA!");
+            console.log(rpcInfo);
             const args: ConnectionInfo = { url: rpcInfo.shardRpc + '/' };
-            if (rpcInfo.shardApiToken) {
+            // if (rpcInfo.shardApiToken) {
+            //     console.log("SETTING X-API-KEY");
+            //     console.log(rpcInfo.shardApiToken);
+            //     args.headers = {
+            //         'x-api-key': rpcInfo.shardApiToken,
+            //     };
+            // } else 
+            if (rpcInfo.xSignature) {
+                console.log("SETTING X-SIGNATURE");
+                console.log(rpcInfo.xSignature);
                 args.headers = {
-                    'x-api-key': rpcInfo.shardApiToken,
+                    //'x-api-key': rpcInfo.shardApiToken,
+                    'x-signature': rpcInfo.xSignature,
                 };
             }
             provider = new RpcProvider(args);
@@ -225,6 +237,8 @@ export default class Wallet {
             provider,
             signer: this.signerIgnoringLedger,
         });
+        console.log("OPET CONNECTION");
+        console.log(this.connection);
         this.getAccountsLocalStorage();
         this.accountId = localStorage.getItem(KEY_ACTIVE_ACCOUNT_ID) || '';
     }
@@ -993,6 +1007,7 @@ export default class Wallet {
                     ? MULTISIG_CHANGE_METHODS
                     : methodNames;
 
+                console.log("ADDING KEY!");
                 return await account.addKey(
                     publicKey.toString(),
                     contractId,
@@ -1239,6 +1254,9 @@ export default class Wallet {
     }
 
     getAccountBasic(accountId) {
+        console.log("BASICS");
+        console.log(this.accountId);
+        console.log(this.connection);
         return new nearApiJs.Account(this.connection, accountId);
     }
 
@@ -1264,6 +1282,56 @@ export default class Wallet {
 
         const account = await this.getAccount(accountId);
         return await account.getAccountBalance(limitedAccountData);
+    }
+
+    async fetchChallenge() {
+        const response = await fetch("https://alpha.app.staging.calimero.network/api/public/challenge", {
+            method: 'POST',
+            headers: {
+                'Content-type': 'application/json; charset=utf-8',
+            },
+        });
+        console.log(response);
+        if (!response.ok) {
+            const body = await response.text();
+            let parsedBody;
+    
+            try {
+                parsedBody = JSON.parse(body);
+            } catch (e) {
+                throw new Error("something went wrong");
+            }
+    
+            throw new Error("something went wrong");
+        } else {
+            console.log("OK");
+        }
+        return await response.json();
+    }
+
+    async signatureFor2(account, challenge) {
+        const { accountId } = account;
+
+        const signer = account.signerIgnoringLedger || account.connection.signer;
+        console.log("SIGNER");
+        const pubk = await signer.getPublicKey();
+        console.log(pubk);
+
+        // const challenge = await this.fetchChallenge();
+        // console.log('FETCHED CHALLENGE');
+        // console.log(challenge);
+
+        console.log("BEFORE SIGNING");
+        const signed = await signer.signMessage(
+            Buffer.from(challenge),
+            accountId,
+            CONFIG.NETWORK_ID
+        );
+        console.log("AFTER SIGNING");
+        const signature = Buffer.from(signed.signature).toString('base64');
+        const publicKey = signed.publicKey.toString();
+    
+        return { challenge, signature, publicKey, accountId };
     }
 
     async signatureFor(account) {
@@ -1540,6 +1608,8 @@ export default class Wallet {
             provider: this.connection.provider,
             signer: new nearApiJs.InMemorySigner(tempKeyStore),
         });
+        console.log("CONNECTION KKK");
+        console.log(connection);
 
         const connectionConstructor = this.connection;
 
