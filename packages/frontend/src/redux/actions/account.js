@@ -199,10 +199,16 @@ const checkContractId = () => async (dispatch, getState) => {
         }
 
         try {
-            const getAccount = shardInfo
-                ? new Wallet(shardInfo).getAccountBasic
-                : wallet.getAccountBasic;
-            await getAccount(contractId).state();
+            if (shardInfo) {
+                const shardInfoWithAuth = {
+                    ...shardInfo,
+                    xSignature: await wallet.generatePrivateShardXSignature(),
+                };
+                const privateShardWallet = new Wallet(shardInfoWithAuth);
+                await privateShardWallet.getAccountBasic(contractId).state();
+            } else {
+                await wallet.getAccountBasic(contractId).state();
+            }
         } catch (error) {
             if (error.message.indexOf('does not exist while viewing') !== -1) {
                 redirectIncorrectContractId();
@@ -249,18 +255,17 @@ export const allowLogin = () => async (dispatch, getState) => {
 
     const shardInfo = selectAccountUrlPrivateShard(getState());
     const addAccessKeyAction = shardInfo ? addShardAccessKey : addAccessKey;
+    const shardInfoWithAuth = shardInfo
+        ? {
+              ...shardInfo,
+              xSignature: await wallet.generatePrivateShardXSignature(),
+          }
+        : shardInfo;
 
-    if (shardInfo) {
-        const account = await wallet.getAccount(wallet.accountId);
-        const signature = await wallet.signatureFor(account);
-        const publicKey = await wallet.getPublicKey(account.accountId);
-        const publicKeyString = publicKey.toString(publicKey);
-        signature.publicKey = publicKeyString;
+    if (shardInfoWithAuth) {
         await syncPrivateShardAccount({
             accountId: wallet.accountId,
-            publicKey: publicKeyString,
-            signature,
-            shardInfo,
+            shardInfoWithAuth,
         });
     }
 
@@ -274,7 +279,7 @@ export const allowLogin = () => async (dispatch, getState) => {
                         publicKey,
                         false,
                         methodNames,
-                        shardInfo
+                        shardInfoWithAuth
                     ),
                     { onlyError: true }
                 )
@@ -301,7 +306,7 @@ export const allowLogin = () => async (dispatch, getState) => {
                     publicKey,
                     false,
                     methodNames,
-                    shardInfo
+                    shardInfoWithAuth
                 ),
                 { data: { title } }
             )
@@ -645,10 +650,10 @@ export const { addAccessKey, addAccessKeySeedPhrase, addShardAccessKey } = creat
             publicKey,
             fullAccess = false,
             methodNames = '',
-            shardInfo
+            shardInfoWithAuth
         ) => {
             try {
-                await new Wallet(shardInfo).addAccessKey(
+                await new Wallet(shardInfoWithAuth).addAccessKey(
                     accountId,
                     contractId,
                     publicKey,
