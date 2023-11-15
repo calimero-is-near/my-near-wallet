@@ -1,5 +1,6 @@
 import { getNearRpcClient } from '@meteorwallet/meteor-near-sdk';
 import type { ENearNetwork } from '@meteorwallet/meteor-near-sdk/dist/packages/common/core/modules/blockchains/near/core/types/near_basic_types.d.ts';
+import createError from 'http-errors';
 import isEqual from 'lodash.isequal';
 import * as nearApiJs from 'near-api-js';
 import { MULTISIG_CHANGE_METHODS } from 'near-api-js/lib/account_multisig';
@@ -206,9 +207,9 @@ export default class Wallet {
         let provider;
         if (rpcInfo) {
             const args: ConnectionInfo = { url: rpcInfo.shardRpc + '/' };
-            if (rpcInfo.shardApiToken) {
+            if (rpcInfo.xSignature) {
                 args.headers = {
-                    'x-api-key': rpcInfo.shardApiToken,
+                    'x-signature': rpcInfo.xSignature,
                 };
             }
             provider = new RpcProvider(args);
@@ -453,7 +454,6 @@ export default class Wallet {
     }
 
     async getAccountKeyType(accountId) {
-        console.log(wallet);
         const keypair = await wallet.keyStore.getKey(CONFIG.NETWORK_ID, accountId);
         return this.getPublicKeyType(accountId, keypair.getPublicKey().toString());
     }
@@ -992,7 +992,6 @@ export default class Wallet {
                 const finalMethodNames = isMultisig
                     ? MULTISIG_CHANGE_METHODS
                     : methodNames;
-
                 return await account.addKey(
                     publicKey.toString(),
                     contractId,
@@ -1264,6 +1263,51 @@ export default class Wallet {
 
         const account = await this.getAccount(accountId);
         return await account.getAccountBalance(limitedAccountData);
+    }
+
+    async fetchChallenge() {
+        const response = await fetch(`${CONFIG.CALIMERO_URL}/api/public/challenge`, {
+            method: 'POST',
+            headers: {
+                'Content-type': 'application/json; charset=utf-8',
+            },
+        });
+        console.log(response);
+        if (!response.ok) {
+            const body = await response.text();
+            let parsedBody;
+    
+            try {
+                parsedBody = JSON.parse(body);
+            } catch (e) {
+                throw createError(response.status, body);
+            }
+    
+            throw createError(response.status, parsedBody);
+        }
+        return await response.json();
+    }
+
+    async signatureForChallenge(account, challenge) {
+        const { accountId } = account;
+        const signer = account.signerIgnoringLedger || account.connection.signer;
+        const signed = await signer.signMessage(
+            Buffer.from(challenge),
+            accountId,
+            CONFIG.NETWORK_ID
+        );
+        const signature = Buffer.from(signed.signature).toString('base64');
+        const publicKey = signed.publicKey.toString();
+    
+        return { challenge, signature, publicKey, accountId };
+    }
+
+    async generatePrivateShardXSignature() {
+        const challenge = await this.fetchChallenge();
+        const account = await this.getAccount(wallet.accountId);
+        const signedChallenge = await this.signatureForChallenge(account, challenge.data);
+        const encodedSig = Buffer.from(JSON.stringify(signedChallenge)).toString('base64');
+        return encodedSig;
     }
 
     async signatureFor(account) {

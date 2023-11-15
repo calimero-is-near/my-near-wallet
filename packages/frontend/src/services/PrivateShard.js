@@ -4,14 +4,10 @@ import CONFIG from '../config';
 
 export async function syncPrivateShardAccount({
     accountId,
-    publicKey,
-    signature,
     shardInfo,
 }) {
     const postData = {
         accountId,
-        publicKey,
-        signature,
         shardId: shardInfo.shardId,
     };
     const response = await fetch(`${CONFIG.CALIMERO_URL}/api/public/sync`, {
@@ -19,6 +15,7 @@ export async function syncPrivateShardAccount({
         body: JSON.stringify(postData),
         headers: {
             'Content-type': 'application/json; charset=utf-8',
+            'x-signature': shardInfo.xSignature,
         },
     });
     if (!response.ok) {
